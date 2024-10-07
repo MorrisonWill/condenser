@@ -1,50 +1,42 @@
-# React + TypeScript + Vite
+# Condensed Audio Creator
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Description
 
-Currently, two official plugins are available:
+This web application allows users to extract spoken dialogue from video files using subtitle information. It's designed to help language learners create condensed audio files containing only the spoken parts of TV shows or movies.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## Expanding the ESLint configuration
+- Upload video files and corresponding subtitle files
+- Extract audio segments based on subtitle timings
+- Download the resulting condensed audio
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## Usage
 
-- Configure the top-level `parserOptions` property like this:
+1. Upload a video file
+2. Upload the corresponding subtitle file
+3. Click "Extract Audio" to process the files
+4. Download the resulting condensed audio file
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## Technical Details
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+- Built with React and TypeScript
+- Uses Web Audio API for audio processing
+- Subtitle parsing with @plussub/srt-vtt-parser
+- WAV encoding with audiobuffer-to-wav
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+## Installation
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+1. Clone the repository
+2. Run `npm install` to install dependencies
+3. Use `npm run dev` to start the development server
+
+## Dependencies
+
+- React
+- TypeScript
+- @plussub/srt-vtt-parser
+- audiobuffer-to-wav
+
+## Contributing
+
+Contributions are welcome.
