@@ -52,13 +52,15 @@ export default function AudioExtractor() {
 
         let destinationOffset = 0
 
+        const padding = 0.5; // half a second padding
+
         for (const { start, end } of subtitles) {
-            const duration = end - start
+            const duration = end - start + (2 * padding)
             const sourceBuffer = offlineContext.createBufferSource()
             sourceBuffer.buffer = audioBuffer
 
             sourceBuffer.connect(offlineContext.destination)
-            sourceBuffer.start(destinationOffset, start, duration)
+            sourceBuffer.start(destinationOffset, start - padding, duration)
 
             destinationOffset += duration
         }
