@@ -215,10 +215,10 @@ export default function AudioExtractor() {
 
         for (let i = 0; i < fileSets.length; i++) {
             const fileSet = fileSets[i]
-            if (fileSet.downloadUrl && fileSet.videoFile) {
+            if (fileSet.downloadUrl) {
                 const response = await fetch(fileSet.downloadUrl)
                 const blob = await response.blob()
-                zip.file(`${fileSet.videoFile.name}_CONDENSED.wav`, blob)
+                zip.file(`${fileSet.videoFile?.name ?? i + 1}_CONDENSED.wav`, blob)
             }
         }
 
@@ -305,7 +305,7 @@ export default function AudioExtractor() {
                                     {fileSet.downloadUrl && !isProcessing && (
                                         <Button asChild variant="outline" className="w-full">
                                             <a href={fileSet.downloadUrl}
-                                               download={`condensed_audio_episode_${index + 1}.wav`}>
+                                               download={`${fileSet.videoFile?.name ?? index + 1}_CONDENSED.wav`}>
                                                 <Download className="mr-2 h-4 w-4"/>
                                                 Download Audio
                                             </a>
