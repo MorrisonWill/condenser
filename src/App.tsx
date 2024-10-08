@@ -1,46 +1,69 @@
-import React, {useState, useCallback} from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { Label } from "@/components/ui/label"
-import {Upload, Download, Loader2, Captions, Github} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { parse } from '@plussub/srt-vtt-parser'
+import React, {useCallback, useState} from "react"
+import {Button} from "@/components/ui/button"
+import {Input} from "@/components/ui/input"
+import {Progress} from "@/components/ui/progress"
+import {Label} from "@/components/ui/label"
+import {Captions, Download, FileAudio, FileVideo, Github, Loader2, Plus, X} from "lucide-react"
+import {useToast} from "@/hooks/use-toast"
+import {parse as parseSrtVtt} from '@plussub/srt-vtt-parser'
+import {parse as parseAss} from 'ass-compiler'
 import audioBufferToWav from 'audiobuffer-to-wav'
+import {Card, CardContent, CardFooter, CardHeader, CardTitle} from "@/components/ui/card"
+import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
 
-// TODO: Add support for more subtitle formats
-// TODO: Add support for custom padding maybe
-// TODO: Improve padding
-// TODO: Add support for condensing multiple episodes at once
-// TODO: Someone mentioned condensing the subtitles as well?
+interface FileSet {
+    id: string;
+    videoFile: File | null;
+    subtitleFile: File | null;
+    downloadUrl?: string;
+}
 
 export default function AudioExtractor() {
-    const [videoFile, setVideoFile] = useState<File | null>(null)
-    const [subtitleFile, setSubtitleFile] = useState<File | null>(null)
+    const [fileSets, setFileSets] = useState<FileSet[]>([{ id: '1', videoFile: null, subtitleFile: null }])
     const [isProcessing, setIsProcessing] = useState(false)
     const [progress, setProgress] = useState(0)
-    const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
 
     const { toast } = useToast()
 
-    const handleVideoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (id: string, type: 'video' | 'subtitle') => (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0]
-        setVideoFile(selectedFile || null)
+        setFileSets(prev => prev.map(set =>
+            set.id === id ? { ...set, [`${type}File`]: selectedFile || null } : set
+        ))
     }
 
-    const handleSubtitleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0]
-        setSubtitleFile(selectedFile || null)
+    const addFileSet = () => {
+        setFileSets(prev => [...prev, { id: Date.now().toString(), videoFile: null, subtitleFile: null }])
+    }
+
+    const removeFileSet = (id: string) => {
+        setFileSets(prev => prev.filter(set => set.id !== id))
     }
 
     const parseSubtitles = async (file: File): Promise<Array<{ start: number; end: number }>> => {
         const text = await file.text()
-        const { entries } = parse(text)
+        const fileExtension = file.name.split('.').pop()?.toLowerCase()
+
+        let periods: Array<{ start: number; end: number }>
+
+        if (fileExtension === 'ass') {
+            const parsed = parseAss(text)
+            periods = parsed.events.dialogue.map(dialogue => ({
+                start: dialogue.Start,
+                end: dialogue.End
+            }))
+        } else {
+            const { entries } = parseSrtVtt(text)
+            periods = entries.map(item => ({
+                start: item.from / 1000,
+                end: item.to / 1000
+            }))
+        }
 
         const padding = 0.5
-        let periods = entries.map(item => ({
-            start: item.from / 1000 - padding,
-            end: item.to / 1000 + padding
+        periods = periods.map(period => ({
+            start: Math.max(0, period.start - padding),
+            end: period.end + padding
         }))
 
         periods.sort((a, b) => a.start - b.start)
@@ -96,25 +119,31 @@ export default function AudioExtractor() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault()
-        if (!videoFile || !subtitleFile) return
+        if (fileSets.some(set => !set.videoFile || !set.subtitleFile)) return
 
         setIsProcessing(true)
         setProgress(0)
 
         try {
-            const subtitles = await parseSubtitles(subtitleFile)
-            setProgress(20)
+            const updatedFileSets = [...fileSets]
 
-            const audioBlob = await extractAudio(videoFile, subtitles)
-            setProgress(90)
+            for (let i = 0; i < updatedFileSets.length; i++) {
+                const { videoFile, subtitleFile } = updatedFileSets[i]
+                if (!videoFile || !subtitleFile) continue
 
-            const url = URL.createObjectURL(audioBlob)
-            setDownloadUrl(url)
-            setProgress(100)
+                const subtitles = await parseSubtitles(subtitleFile)
+                setProgress((i + 0.5) / updatedFileSets.length * 100)
+
+                const audioBlob = await extractAudio(videoFile, subtitles)
+                updatedFileSets[i].downloadUrl = URL.createObjectURL(audioBlob)
+                setProgress((i + 1) / updatedFileSets.length * 100)
+            }
+
+            setFileSets(updatedFileSets)
 
             toast({
                 title: "Audio extracted successfully",
-                description: "Your condensed audio file is ready for download.",
+                description: "Your condensed audio files are ready for download.",
             })
         } catch (error) {
             console.error("Error processing audio:", error)
@@ -129,96 +158,133 @@ export default function AudioExtractor() {
     }
 
     return (
-        <div className="max-w-md mx-auto mt-10 p-6 bg-card rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold mb-4 text-center">Condensed Audio Maker</h1>
-            <div className="mt-6 text-sm text-muted-foreground">
-                <h3 className="font-semibold mb-2">How it works:</h3>
-                <ol className="list-decimal list-inside space-y-1">
-                    <li>Upload a video file (TV show, anime episode, etc.)</li>
-                    <li>Upload the corresponding subtitle file</li>
-                    <li>Our system extracts only the spoken dialogue based on the subtitles</li>
-                    <li>Download the condensed audio file</li>
-                </ol>
-            </div>
+        <div className="max-w-3xl mx-auto my-10 p-6 bg-background">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-3xl font-bold text-center">Condensed Audio Maker</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Accordion type="single" collapsible className="mb-6">
+                        <AccordionItem value="how-it-works">
+                            <AccordionTrigger>How it works</AccordionTrigger>
+                            <AccordionContent>
+                                <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                                    <li>Upload video files (TV show episodes, anime episodes, etc.)</li>
+                                    <li>Upload the corresponding subtitle files</li>
+                                    <li>Our system extracts only the spoken dialogue based on the subtitles</li>
+                                    <li>Download the condensed audio files for each episode</li>
+                                </ol>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
 
-            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                    <Label htmlFor="video-upload">Choose Video File</Label>
-                    <div className="flex items-center space-x-2">
-                        <Input
-                            id="video-upload"
-                            type="file"
-                            accept="video/*"
-                            onChange={handleVideoFileChange}
-                            className="flex-grow"
-                            required
-                        />
-                        <Upload className="text-muted-foreground"/>
-                    </div>
-                </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {fileSets.map((fileSet, index) => (
+                            <Card key={fileSet.id} className="relative">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-xl flex justify-between items-center">
+                                        Episode {index + 1}
+                                        {fileSets.length > 1 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-auto p-1 text-muted-foreground hover:text-foreground"
+                                                onClick={() => removeFileSet(fileSet.id)}
+                                            >
+                                                <X className="w-4 h-4" />
+                                                <span className="sr-only">Remove Episode</span>
+                                            </Button>
+                                        )}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div>
+                                        <Label htmlFor={`video-upload-${fileSet.id}`} className="mb-2 block">Video File</Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Input
+                                                id={`video-upload-${fileSet.id}`}
+                                                type="file"
+                                                accept="video/*"
+                                                onChange={handleFileChange(fileSet.id, 'video')}
+                                                className="flex-grow"
+                                                required
+                                            />
+                                            <FileVideo className="text-muted-foreground"/>
+                                        </div>
+                                    </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="subtitle-upload">Choose Subtitle File</Label>
-                    <div className="flex items-center space-x-2">
-                        <Input
-                            id="subtitle-upload"
-                            type="file"
-                            accept=".srt,.vtt,.ass"
-                            onChange={handleSubtitleFileChange}
-                            className="flex-grow"
-                            required
-                        />
-                        <Captions className="text-muted-foreground"/>
-                    </div>
-                </div>
+                                    <div>
+                                        <Label htmlFor={`subtitle-upload-${fileSet.id}`} className="mb-2 block">Subtitle File</Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Input
+                                                id={`subtitle-upload-${fileSet.id}`}
+                                                type="file"
+                                                accept=".srt,.vtt,.ass"
+                                                onChange={handleFileChange(fileSet.id, 'subtitle')}
+                                                className="flex-grow"
+                                                required
+                                            />
+                                            <Captions className="text-muted-foreground"/>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    {fileSet.downloadUrl && !isProcessing && (
+                                        <Button asChild variant="outline" className="w-full">
+                                            <a href={fileSet.downloadUrl} download={`condensed_audio_episode_${index + 1}.wav`}>
+                                                <Download className="mr-2 h-4 w-4"/>
+                                                Download Audio
+                                            </a>
+                                        </Button>
+                                    )}
+                                </CardFooter>
+                            </Card>
+                        ))}
 
-                <Button type="submit" className="w-full" disabled={!videoFile || !subtitleFile || isProcessing}>
-                    {isProcessing ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
-                            Processing...
-                        </>
-                    ) : (
-                        "Extract Audio"
+                        <div className="flex space-x-4">
+                            <Button type="button" onClick={addFileSet} variant="outline" className="flex-1">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Another Episode
+                            </Button>
+                            <Button type="submit" className="flex-1" disabled={fileSets.some(set => !set.videoFile || !set.subtitleFile) || isProcessing}>
+                                {isProcessing ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FileAudio className="mr-2 h-4 w-4" />
+                                        Extract Audio
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </form>
+
+                    {isProcessing && (
+                        <div className="mt-6">
+                            <Progress value={progress} className="w-full"/>
+                            <p className="text-sm text-muted-foreground mt-2 text-center">Extracting and condensing audio...</p>
+                        </div>
                     )}
-                </Button>
-            </form>
-
-            {isProcessing && (
-                <div className="mt-4">
-                    <Progress value={progress} className="w-full"/>
-                    <p className="text-sm text-muted-foreground mt-2 text-center">Extracting and condensing audio...</p>
-                </div>
-            )}
-
-            {downloadUrl && !isProcessing && (
-                <div className="mt-6">
-                    <h2 className="text-lg font-semibold mb-2">Your audio is ready!</h2>
-                    <Button asChild className="w-full">
-                        <a href={downloadUrl}
-                           download={videoFile?.name.substring(0, videoFile?.name.lastIndexOf('.')) || "condensed_audio.mp3"}>
-                            <Download className="mr-2 h-4 w-4"/>
-                            Download MP3
-                        </a>
-                    </Button>
-                </div>
-            )}
-
-            <p className="text-muted-foreground mb-6 text-center">
-                All processing is done locally. Your files are not uploaded anywhere.
-            </p>
-
-            <div className="mt-6 text-sm text-center">
-                <a
-                    href="https://github.com/MorrisonWill/condenser"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    <Github className="w-4 h-4 mr-2"/>
-                    View source on GitHub
-                </a>
-            </div>
+                </CardContent>
+                <CardFooter className="flex flex-col items-center space-y-4">
+                    <p className="text-sm text-muted-foreground text-center">
+                        All processing is done locally. Your files are not uploaded anywhere.
+                    </p>
+                    <a
+                        href="https://github.com/MorrisonWill/condenser"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <Github className="w-4 h-4 mr-2"/>
+                        View source on GitHub
+                    </a>
+                </CardFooter>
+            </Card>
         </div>
     )
 }
