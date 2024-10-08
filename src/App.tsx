@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +11,10 @@ import audioBufferToWav from 'audiobuffer-to-wav'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { FileInput } from "@/components/FileInput"
+import JSZip from 'jszip'
+import { saveAs } from 'file-saver'
+
 
 interface FileSet {
     id: string;
@@ -26,17 +28,20 @@ export default function AudioExtractor() {
     const [isProcessing, setIsProcessing] = useState(false)
     const [progress, setProgress] = useState(0)
     const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
+    const [showDownloadDialog, setShowDownloadDialog] = useState(false)
     const [bulkVideoFiles, setBulkVideoFiles] = useState<File[]>([])
     const [bulkSubtitleFiles, setBulkSubtitleFiles] = useState<File[]>([])
+
 
     const { toast } = useToast()
 
     const handleFileChange = (id: string, type: 'video' | 'subtitle') => (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0]
+        const selectedFile = event.target.files?.[0] || null
         setFileSets(prev => prev.map(set =>
-            set.id === id ? { ...set, [`${type}File`]: selectedFile || null } : set
+            set.id === id ? { ...set, [`${type}File`]: selectedFile } : set
         ))
     }
+
 
     const addFileSet = () => {
         setFileSets(prev => [...prev, { id: Date.now().toString(), videoFile: null, subtitleFile: null }])
@@ -74,16 +79,15 @@ export default function AudioExtractor() {
         const newFileSets = bulkVideoFiles.map((videoFile, index) => ({
             id: Date.now().toString() + index,
             videoFile,
-            subtitleFile: bulkSubtitleFiles[index] || null
+            subtitleFile: bulkSubtitleFiles[index] || null,
         }))
-
-        console.log(newFileSets)
 
         setFileSets(newFileSets)
         setBulkUploadOpen(false)
         setBulkVideoFiles([])
         setBulkSubtitleFiles([])
     }
+
 
     const parseSubtitles = async (file: File): Promise<Array<{ start: number; end: number }>> => {
         const text = await file.text()
@@ -186,6 +190,10 @@ export default function AudioExtractor() {
 
             setFileSets(updatedFileSets)
 
+            if (updatedFileSets.length > 1) {
+                setShowDownloadDialog(true)
+            }
+
             toast({
                 title: "Audio extracted successfully",
                 description: "Your condensed audio files are ready for download.",
@@ -201,6 +209,25 @@ export default function AudioExtractor() {
             setIsProcessing(false)
         }
     }
+
+    const handleZipDownload = async () => {
+        const zip = new JSZip()
+
+        for (let i = 0; i < fileSets.length; i++) {
+            const fileSet = fileSets[i]
+            if (fileSet.downloadUrl && fileSet.videoFile) {
+                const response = await fetch(fileSet.downloadUrl)
+                const blob = await response.blob()
+                zip.file(`${fileSet.videoFile.name}_CONDENSED.wav`, blob)
+            }
+        }
+
+        const content = await zip.generateAsync({ type: "blob" })
+        saveAs(content, "condensed_audio_files.zip")
+        setShowDownloadDialog(false)
+    }
+
+
 
     return (
         <div className="max-w-3xl mx-auto my-10 p-6 bg-background">
@@ -245,28 +272,30 @@ export default function AudioExtractor() {
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div>
-                                        <Label htmlFor={`video-upload-${fileSet.id}`} className="mb-2 block">Video File</Label>
+                                        <Label htmlFor={`video-upload-${fileSet.id}`} className="mb-2 block">Video
+                                            File</Label>
                                         <div className="flex items-center space-x-2">
-                                            <Input
+                                            <FileInput
                                                 id={`video-upload-${fileSet.id}`}
-                                                type="file"
                                                 accept="video/*,.mkv"
                                                 onChange={handleFileChange(fileSet.id, 'video')}
                                                 className="flex-grow"
+                                                value={fileSet.videoFile?.name}
                                             />
                                             <FileVideo className="text-muted-foreground"/>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <Label htmlFor={`subtitle-upload-${fileSet.id}`} className="mb-2 block">Subtitle File</Label>
+                                        <Label htmlFor={`subtitle-upload-${fileSet.id}`} className="mb-2 block">Subtitle
+                                            File</Label>
                                         <div className="flex items-center space-x-2">
-                                            <Input
+                                            <FileInput
                                                 id={`subtitle-upload-${fileSet.id}`}
-                                                type="file"
                                                 accept=".srt,.vtt,.ass"
                                                 onChange={handleFileChange(fileSet.id, 'subtitle')}
                                                 className="flex-grow"
+                                                value={fileSet.subtitleFile?.name}
                                             />
                                             <Captions className="text-muted-foreground"/>
                                         </div>
@@ -275,13 +304,31 @@ export default function AudioExtractor() {
                                 <CardFooter>
                                     {fileSet.downloadUrl && !isProcessing && (
                                         <Button asChild variant="outline" className="w-full">
-                                            <a href={fileSet.downloadUrl} download={`condensed_audio_episode_${index + 1}.wav`}>
+                                            <a href={fileSet.downloadUrl}
+                                               download={`condensed_audio_episode_${index + 1}.wav`}>
                                                 <Download className="mr-2 h-4 w-4"/>
                                                 Download Audio
                                             </a>
                                         </Button>
                                     )}
                                 </CardFooter>
+                                <Dialog open={showDownloadDialog} onOpenChange={setShowDownloadDialog}>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Download Options</DialogTitle>
+                                        </DialogHeader>
+                                        <p>You have processed multiple files. Would you like to download them all as a zip file?</p>
+                                        <div className="flex justify-end space-x-2 mt-4">
+                                            <Button variant="outline" onClick={() => setShowDownloadDialog(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button onClick={handleZipDownload}>
+                                                Download Zip
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+
                             </Card>
                         ))}
 
