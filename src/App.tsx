@@ -8,6 +8,12 @@ import { useToast } from "@/hooks/use-toast"
 import { parse } from '@plussub/srt-vtt-parser'
 import audioBufferToWav from 'audiobuffer-to-wav'
 
+// TODO: Add support for more subtitle formats
+// TODO: Add support for custom padding maybe
+// TODO: Improve padding
+// TODO: Add support for condensing multiple episodes at once
+// TODO: Someone mentioned condensing the subtitles as well?
+
 export default function AudioExtractor() {
     const [videoFile, setVideoFile] = useState<File | null>(null)
     const [subtitleFile, setSubtitleFile] = useState<File | null>(null)
