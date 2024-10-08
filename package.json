@@ -29,6 +29,7 @@
     "lucide-react": "^0.447.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "streamsaver": "^2.0.6",
     "subtitle": "^4.2.1",
     "tailwind-merge": "^2.5.3",
     "tailwindcss-animate": "^1.0.7"
@@ -39,6 +40,7 @@
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
+    "@types/streamsaver": "^2.0.5",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.11.1",

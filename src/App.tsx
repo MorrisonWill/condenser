@@ -15,7 +15,6 @@ import { FileInput } from "@/components/FileInput"
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 
-
 interface FileSet {
     id: string;
     videoFile: File | null;
@@ -26,7 +25,10 @@ interface FileSet {
 export default function AudioExtractor() {
     const [fileSets, setFileSets] = useState<FileSet[]>([{ id: '1', videoFile: null, subtitleFile: null }])
     const [isProcessing, setIsProcessing] = useState(false)
+    const [isZipping, setIsZipping] = useState(false)
     const [progress, setProgress] = useState(0)
+    const [zipProgress, setZipProgress] = useState(0)
+
     const [bulkUploadOpen, setBulkUploadOpen] = useState(false)
     const [showDownloadDialog, setShowDownloadDialog] = useState(false)
     const [bulkVideoFiles, setBulkVideoFiles] = useState<File[]>([])
@@ -67,7 +69,7 @@ export default function AudioExtractor() {
     }
 
     const applyBulkUpload = () => {
-        if (bulkVideoFiles.length === 0 || bulkSubtitleFiles.length === 0) {
+        if (bulkVideoFiles.length === 0 || bulkSubtitleFiles.length === 0 || bulkSubtitleFiles.length !== bulkVideoFiles.length) {
             toast({
                 title: "Incomplete selection",
                 description: "Please select both video and subtitle files for bulk upload.",
@@ -213,6 +215,9 @@ export default function AudioExtractor() {
     const handleZipDownload = async () => {
         const zip = new JSZip()
 
+        setZipProgress(0)
+        setIsZipping(true)
+
         for (let i = 0; i < fileSets.length; i++) {
             const fileSet = fileSets[i]
             if (fileSet.downloadUrl) {
@@ -220,14 +225,14 @@ export default function AudioExtractor() {
                 const blob = await response.blob()
                 zip.file(`${fileSet.videoFile?.name ?? i + 1}_CONDENSED.wav`, blob)
             }
+            setZipProgress((i + 0.5) / fileSets.length * 100)
         }
 
         const content = await zip.generateAsync({ type: "blob" })
         saveAs(content, "condensed_audio_files.zip")
+        setIsZipping(false)
         setShowDownloadDialog(false)
     }
-
-
 
     return (
         <div className="max-w-3xl mx-auto my-10 p-6 bg-background">
@@ -326,6 +331,12 @@ export default function AudioExtractor() {
                                                 Download Zip
                                             </Button>
                                         </div>
+                                        {isZipping && (
+                                            <div className="mt-6">
+                                                <Progress value={zipProgress} className="w-full"/>
+                                                <p className="text-sm text-muted-foreground mt-2 text-center">Creating zip file...</p>
+                                            </div>
+                                        )}
                                     </DialogContent>
                                 </Dialog>
 
