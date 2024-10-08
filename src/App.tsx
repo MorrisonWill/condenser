@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Label } from "@/components/ui/label"
-import { Upload, Download, Loader2, Captions } from "lucide-react"
+import {Upload, Download, Loader2, Captions, Github} from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { parse } from '@plussub/srt-vtt-parser'
 import audioBufferToWav from 'audiobuffer-to-wav'
@@ -201,6 +201,18 @@ export default function AudioExtractor() {
             <p className="text-muted-foreground mb-6 text-center">
                 All processing is done locally. Your files are not uploaded anywhere.
             </p>
+
+            <div className="mt-6 text-sm text-center">
+                <a
+                    href="https://github.com/MorrisonWill/condenser"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    <Github className="w-4 h-4 mr-2"/>
+                    View source on GitHub
+                </a>
+            </div>
         </div>
     )
 }
