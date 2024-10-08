@@ -1,19 +1,19 @@
-import React, { useCallback, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { Label } from "@/components/ui/label"
-import { Captions, Download, FileAudio, FileVideo, Loader2, Plus, X, Upload } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { parse as parseSrtVtt } from '@plussub/srt-vtt-parser'
-import { parse as parseAss } from 'ass-compiler'
+import React, {useCallback, useState} from "react"
+import {Button} from "@/components/ui/button"
+import {Input} from "@/components/ui/input"
+import {Progress} from "@/components/ui/progress"
+import {Label} from "@/components/ui/label"
+import {Captions, Download, FileAudio, FileVideo, Loader2, Plus, X, Upload} from "lucide-react"
+import {useToast} from "@/hooks/use-toast"
+import {parse as parseSrtVtt} from '@plussub/srt-vtt-parser'
+import {parse as parseAss} from 'ass-compiler'
 import audioBufferToWav from 'audiobuffer-to-wav'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { FileInput } from "@/components/FileInput"
+import {Card, CardContent, CardFooter, CardHeader, CardTitle} from "@/components/ui/card"
+import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion"
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog"
+import {FileInput} from "@/components/FileInput"
 import JSZip from 'jszip'
-import { saveAs } from 'file-saver'
+import {saveAs} from 'file-saver'
 
 interface FileSet {
     id: string;
@@ -23,7 +23,7 @@ interface FileSet {
 }
 
 export default function AudioExtractor() {
-    const [fileSets, setFileSets] = useState<FileSet[]>([{ id: '1', videoFile: null, subtitleFile: null }])
+    const [fileSets, setFileSets] = useState<FileSet[]>([{id: '1', videoFile: null, subtitleFile: null}])
     const [isProcessing, setIsProcessing] = useState(false)
     const [isZipping, setIsZipping] = useState(false)
     const [progress, setProgress] = useState(0)
@@ -35,18 +35,18 @@ export default function AudioExtractor() {
     const [bulkSubtitleFiles, setBulkSubtitleFiles] = useState<File[]>([])
 
 
-    const { toast } = useToast()
+    const {toast} = useToast()
 
     const handleFileChange = (id: string, type: 'video' | 'subtitle') => (event: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = event.target.files?.[0] || null
         setFileSets(prev => prev.map(set =>
-            set.id === id ? { ...set, [`${type}File`]: selectedFile } : set
+            set.id === id ? {...set, [`${type}File`]: selectedFile} : set
         ))
     }
 
 
     const addFileSet = () => {
-        setFileSets(prev => [...prev, { id: Date.now().toString(), videoFile: null, subtitleFile: null }])
+        setFileSets(prev => [...prev, {id: Date.now().toString(), videoFile: null, subtitleFile: null}])
     }
 
     const removeFileSet = (id: string) => {
@@ -101,31 +101,38 @@ export default function AudioExtractor() {
             const parsed = parseAss(text)
             periods = parsed.events.dialogue.map(dialogue => ({
                 start: dialogue.Start,
-                end: dialogue.End
+                end: dialogue.End,
             }))
         } else {
-            const { entries } = parseSrtVtt(text)
+            const {entries} = parseSrtVtt(text)
             periods = entries.map(item => ({
                 start: item.from / 1000,
-                end: item.to / 1000
+                end: item.to / 1000,
             }))
         }
 
-        const padding = 0.5
+        const padding = 0.20
         periods = periods.map(period => ({
             start: Math.max(0, period.start - padding),
-            end: period.end + padding
+            // if end doesn't exist, set to huge number to go to end of episode
+            end: period.end + padding,
         }))
-
-        const mergedPeriods: Array<{ start: number; end: number }> = []
 
         periods.sort((a, b) => a.start - b.start)
 
-        for (let i = 0; i < periods.length; i++) {
+        const mergedPeriods: Array<{ start: number; end: number }> = []
+
+        for (let i = 0; i < periods.length - 1; i++) {
             const first = periods[i]
-            const second = periods[i+1]
-            if ((first.end + 3) >= second.start) {
-                // merge them
+            const second = periods[i + 1]
+
+            console.log(first, second)
+            if (second === undefined) {
+                mergedPeriods.push(first)
+                break
+            }
+
+            if (first.end >= second.start) {
                 mergedPeriods.push({
                     start: first.start,
                     end: second.end
@@ -151,7 +158,7 @@ export default function AudioExtractor() {
 
         let destinationOffset = 0
 
-        for (const { start, end } of subtitles) {
+        for (const {start, end} of subtitles) {
             const duration = end - start
             const sourceBuffer = offlineContext.createBufferSource()
             sourceBuffer.buffer = audioBuffer
@@ -165,7 +172,7 @@ export default function AudioExtractor() {
         const renderedBuffer = await offlineContext.startRendering()
 
         const wav = audioBufferToWav(renderedBuffer)
-        return new Blob([wav], { type: 'audio/wav' })
+        return new Blob([wav], {type: 'audio/wav'})
     }, [])
 
     const handleSubmit = async (event: React.FormEvent) => {
@@ -179,7 +186,7 @@ export default function AudioExtractor() {
             const updatedFileSets = [...fileSets]
 
             for (let i = 0; i < updatedFileSets.length; i++) {
-                const { videoFile, subtitleFile } = updatedFileSets[i]
+                const {videoFile, subtitleFile} = updatedFileSets[i]
                 if (!videoFile || !subtitleFile) continue
 
                 const subtitles = await parseSubtitles(subtitleFile)
@@ -228,7 +235,7 @@ export default function AudioExtractor() {
             setZipProgress((i + 0.5) / fileSets.length * 100)
         }
 
-        const content = await zip.generateAsync({ type: "blob" })
+        const content = await zip.generateAsync({type: "blob"})
         saveAs(content, "condensed_audio_files.zip")
         setIsZipping(false)
         setShowDownloadDialog(false)
@@ -246,7 +253,9 @@ export default function AudioExtractor() {
                             <AccordionTrigger>How it works</AccordionTrigger>
                             <AccordionContent>
                                 <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-                                    <li>Upload video files (TV show episodes, anime episodes, etc.) individually or in bulk</li>
+                                    <li>Upload video files (TV show episodes, anime episodes, etc.) individually or in
+                                        bulk
+                                    </li>
                                     <li>Upload the corresponding subtitle files individually or in bulk</li>
                                     <li>Our system extracts only the spoken dialogue based on the subtitles</li>
                                     <li>Download the condensed audio files for each episode</li>
@@ -269,7 +278,7 @@ export default function AudioExtractor() {
                                                 className="h-auto p-1 text-muted-foreground hover:text-foreground"
                                                 onClick={() => removeFileSet(fileSet.id)}
                                             >
-                                                <X className="w-4 h-4" />
+                                                <X className="w-4 h-4"/>
                                                 <span className="sr-only">Remove Episode</span>
                                             </Button>
                                         )}
@@ -322,7 +331,8 @@ export default function AudioExtractor() {
                                         <DialogHeader>
                                             <DialogTitle>Download Options</DialogTitle>
                                         </DialogHeader>
-                                        <p>You have processed multiple files. Would you like to download them all as a zip file?</p>
+                                        <p>You have processed multiple files. Would you like to download them all as a
+                                            zip file?</p>
                                         <div className="flex justify-end space-x-2 mt-4">
                                             <Button variant="outline" onClick={() => setShowDownloadDialog(false)}>
                                                 Cancel
@@ -334,7 +344,8 @@ export default function AudioExtractor() {
                                         {isZipping && (
                                             <div className="mt-6">
                                                 <Progress value={zipProgress} className="w-full"/>
-                                                <p className="text-sm text-muted-foreground mt-2 text-center">Creating zip file...</p>
+                                                <p className="text-sm text-muted-foreground mt-2 text-center">Creating
+                                                    zip file...</p>
                                             </div>
                                         )}
                                     </DialogContent>
@@ -345,13 +356,13 @@ export default function AudioExtractor() {
 
                         <div className="flex space-x-4">
                             <Button type="button" onClick={addFileSet} variant="outline" className="flex-1">
-                                <Plus className="w-4 h-4 mr-2" />
+                                <Plus className="w-4 h-4 mr-2"/>
                                 Add Another Episode
                             </Button>
                             <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
                                 <DialogTrigger asChild>
                                     <Button type="button" variant="outline" className="flex-1">
-                                        <Upload className="w-4 h-4 mr-2" />
+                                        <Upload className="w-4 h-4 mr-2"/>
                                         Bulk Upload
                                     </Button>
                                 </DialogTrigger>
@@ -361,7 +372,8 @@ export default function AudioExtractor() {
                                     </DialogHeader>
                                     <div className="space-y-4 mt-4">
                                         <div>
-                                            <Label htmlFor="bulk-video-upload" className="mb-2 block">Bulk Video Upload</Label>
+                                            <Label htmlFor="bulk-video-upload" className="mb-2 block">Bulk Video
+                                                Upload</Label>
                                             <Input
                                                 id="bulk-video-upload"
                                                 type="file"
@@ -371,7 +383,8 @@ export default function AudioExtractor() {
                                             />
                                         </div>
                                         <div>
-                                            <Label htmlFor="bulk-subtitle-upload" className="mb-2 block">Bulk Subtitle Upload</Label>
+                                            <Label htmlFor="bulk-subtitle-upload" className="mb-2 block">Bulk Subtitle
+                                                Upload</Label>
                                             <Input
                                                 id="bulk-subtitle-upload"
                                                 type="file"
@@ -386,7 +399,8 @@ export default function AudioExtractor() {
                                     </div>
                                 </DialogContent>
                             </Dialog>
-                            <Button type="submit" className="flex-1" disabled={fileSets.some(set => !set.videoFile || !set.subtitleFile) || isProcessing}>
+                            <Button type="submit" className="flex-1"
+                                    disabled={fileSets.some(set => !set.videoFile || !set.subtitleFile) || isProcessing}>
                                 {isProcessing ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
@@ -394,7 +408,7 @@ export default function AudioExtractor() {
                                     </>
                                 ) : (
                                     <>
-                                        <FileAudio className="mr-2 h-4 w-4" />
+                                        <FileAudio className="mr-2 h-4 w-4"/>
                                         Extract Audio
                                     </>
                                 )}
@@ -405,7 +419,8 @@ export default function AudioExtractor() {
                     {isProcessing && (
                         <div className="mt-6">
                             <Progress value={progress} className="w-full"/>
-                            <p className="text-sm text-muted-foreground mt-2 text-center">Extracting and condensing audio...</p>
+                            <p className="text-sm text-muted-foreground mt-2 text-center">Extracting and condensing
+                                audio...</p>
                         </div>
                     )}
                 </CardContent>
