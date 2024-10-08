@@ -117,21 +117,21 @@ export default function AudioExtractor() {
             end: period.end + padding
         }))
 
+        const mergedPeriods: Array<{ start: number; end: number }> = []
+
         periods.sort((a, b) => a.start - b.start)
 
-        const mergedPeriods: Array<{ start: number; end: number }> = []
-        let currentPeriod = periods[0]
-
-        for (let i = 1; i < periods.length; i++) {
-            if (periods[i].start <= currentPeriod.end) {
-                currentPeriod.end = Math.max(currentPeriod.end, periods[i].end)
-            } else {
-                mergedPeriods.push(currentPeriod)
-                currentPeriod = periods[i]
+        for (let i = 0; i < periods.length; i++) {
+            const first = periods[i]
+            const second = periods[i+1]
+            if ((first.end + 3) >= second.start) {
+                // merge them
+                mergedPeriods.push({
+                    start: first.start,
+                    end: second.end
+                })
             }
         }
-
-        mergedPeriods.push(currentPeriod)
 
         return mergedPeriods
     }
