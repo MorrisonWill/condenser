@@ -282,7 +282,7 @@ export default function AudioExtractor() {
                                         <div className="flex items-center space-x-2">
                                             <FileInput
                                                 id={`video-upload-${fileSet.id}`}
-                                                accept="video/*,.mkv"
+                                                accept="video/*"
                                                 onChange={handleFileChange(fileSet.id, 'video')}
                                                 className="flex-grow"
                                                 value={fileSet.videoFile?.name}
@@ -365,7 +365,7 @@ export default function AudioExtractor() {
                                             <Input
                                                 id="bulk-video-upload"
                                                 type="file"
-                                                accept="video/*,.mkv"
+                                                accept="video/*"
                                                 onChange={handleBulkUpload('video')}
                                                 multiple
                                             />
