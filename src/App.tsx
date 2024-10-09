@@ -92,56 +92,51 @@ export default function AudioExtractor() {
 
 
     const parseSubtitles = async (file: File): Promise<Array<{ start: number; end: number }>> => {
-        const text = await file.text()
-        const fileExtension = file.name.split('.').pop()?.toLowerCase()
+        const text = await file.text();
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
-        let periods: Array<{ start: number; end: number }>
+        let periods: Array<{ start: number; end: number }>;
 
         if (fileExtension === 'ass') {
-            const parsed = parseAss(text)
+            const parsed = parseAss(text);
             periods = parsed.events.dialogue.map(dialogue => ({
                 start: dialogue.Start,
                 end: dialogue.End,
-            }))
+            }));
         } else {
-            const {entries} = parseSrtVtt(text)
+            const { entries } = parseSrtVtt(text);
             periods = entries.map(item => ({
                 start: item.from / 1000,
                 end: item.to / 1000,
-            }))
+            }));
         }
 
-        const padding = 0.20
+        periods.sort((a, b) => a.start - b.start);
+
+        const padding = 0.20;
         periods = periods.map(period => ({
             start: Math.max(0, period.start - padding),
-            // if end doesn't exist, set to huge number to go to end of episode
             end: period.end + padding,
-        }))
+        }));
 
-        periods.sort((a, b) => a.start - b.start)
+        const mergedPeriods: Array<{ start: number; end: number }> = [];
+        let currentPeriod = periods[0];
 
-        const mergedPeriods: Array<{ start: number; end: number }> = []
+        for (let i = 1; i < periods.length; i++) {
+            const nextPeriod = periods[i];
 
-        for (let i = 0; i < periods.length - 1; i++) {
-            const first = periods[i]
-            const second = periods[i + 1]
-
-            console.log(first, second)
-            if (second === undefined) {
-                mergedPeriods.push(first)
-                break
-            }
-
-            if (first.end >= second.start) {
-                mergedPeriods.push({
-                    start: first.start,
-                    end: second.end
-                })
+            if (currentPeriod.end >= nextPeriod.start) {
+                currentPeriod.end = Math.max(currentPeriod.end, nextPeriod.end);
+            } else {
+                mergedPeriods.push(currentPeriod);
+                currentPeriod = nextPeriod;
             }
         }
 
-        return mergedPeriods
-    }
+        mergedPeriods.push(currentPeriod);
+
+        return mergedPeriods;
+    };
 
     const extractAudio = useCallback(async (videoFile: File, subtitles: Array<{ start: number; end: number }>) => {
         const audioContext = new AudioContext()
