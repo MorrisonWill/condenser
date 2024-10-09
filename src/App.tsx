@@ -113,7 +113,7 @@ export default function AudioExtractor() {
 
         periods.sort((a, b) => a.start - b.start);
 
-        const padding = 0.5;
+        const padding = 1;
         periods = periods.map(period => ({
             start: Math.max(0, period.start - padding),
             end: period.end + padding,
